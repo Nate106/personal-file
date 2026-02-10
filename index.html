@@ -92,11 +92,7 @@
     <div id="staff-members"></div>
   </div>
 
-  <div id="calendar" class="section" style="display:none;">
-    <h2>District Calendar</h2>
-    <!-- Embed your Google Calendar iframe here -->
-    <iframe src="https://calendar.google.com/calendar/embed?src=YOUR_CALENDAR_ID&ctz=America/New_York" style="border: 0" width="800" height="600" frameborder="0" scrolling="no"></iframe>
-  </div>
+  
 
   <div id="staff" class="section" style="display:none;">
     <h2>Staff Panel</h2>
@@ -307,4 +303,77 @@
 
   // Logout example (add button if needed)
   // auth.signOut().then(() => location.reload());
+
+// Load calendar events from Firestore
+function loadCalendar() {
+  db.collection('events')
+    .orderBy('date')
+    .get()
+    .then(snapshot => {
+      const container = document.getElementById('calendar-events');
+      container.innerHTML = '';
+
+      if (snapshot.empty) {
+        container.innerHTML = '<p style="color:#777;">No events scheduled yet.</p>';
+        return;
+      }
+
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        const eventDiv = document.createElement('div');
+        eventDiv.style.margin = '12px 0';
+        eventDiv.style.padding = '10px';
+        eventDiv.style.borderLeft = '4px solid #0066cc';
+        eventDiv.innerHTML = `
+          <strong>${data.date || 'Date TBD'}</strong><br>
+          <span style="font-weight:bold;">${data.title || 'Untitled Event'}</span><br>
+          ${data.description || ''}<br>
+          ${data.location ? `<small>Location: ${data.location}</small>` : ''}
+        `;
+        container.appendChild(eventDiv);
+      });
+    })
+    .catch(err => {
+      console.error("Calendar load error:", err);
+      document.getElementById('calendar-events').innerHTML = '<p style="color:red;">Error loading calendar.</p>';
+    });
+}
+
+// Show add event button for admins/co-admins
+function showAddEventButton() {
+  const btn = document.getElementById('add-event-btn');
+  if (['admin', 'co-admin'].includes(userRole)) {
+    btn.style.display = 'inline-block';
+    btn.onclick = addEventPrompt;
+  }
+}
+
+// Simple prompt-based event adder (expand to modal later if you want)
+function addEventPrompt() {
+  const title = prompt("Event Title:");
+  if (!title) return;
+
+  const date = prompt("Date (YYYY-MM-DD):");
+  if (!date) return;
+
+  const desc = prompt("Description (optional):") || "";
+  const loc = prompt("Location (optional):") || "";
+
+  db.collection('events').add({
+    title,
+    date,
+    description: desc,
+    location: loc,
+    createdBy: currentUser.email,
+    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+  })
+  .then(() => {
+    alert("Event added!");
+    loadCalendar(); // refresh list
+  })
+  .catch(err => {
+    alert("Error adding event: " + err.message);
+  });
+}
+
 </script>
